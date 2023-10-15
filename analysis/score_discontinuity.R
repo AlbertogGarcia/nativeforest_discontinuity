@@ -5,6 +5,9 @@ library(rddensity)
 
 clean_data_dir <- here::here("data_prep", "clean")
 
+fig_dir <- here::here("score_figs")
+results_dir <- here::here("score_results")
+
 palette <- list("white" = "#FAFAFA",
                 "light_grey" = "#d9d9d9",
                 "dark" = "#0c2230",
@@ -19,108 +22,21 @@ palette <- list("white" = "#FAFAFA",
 select <- dplyr::select
 
 
-property_df <- readRDS(paste0(clean_data_dir, "/property_df.rds"))%>%
-  filter(!duplicated(paste0(pmax(rptpro_id, rptpre_id, rptpro_ano, rptpro_puntaje, rptpre_comuna), pmin(rptpro_id, rptpre_id, rptpro_ano, rptpro_puntaje, rptpre_comuna))))
-
-
-no_asignados_all <- readRDS(paste0(clean_data_dir, "/no_asignados_all.rds"))%>%
-  mutate(`Contest type`= ifelse(`Tipo Concurso`=="Otros Interesados", "Other interested", "Smallholder"))
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### determine score cutoff for relevant contest years
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-score_cutoffs <- property_df %>%
-  rename(ano_concurso = rptpro_ano)%>%
-  filter(ano_concurso %in% no_asignados_all$`Año Concurso`)%>%
-  filter(`Contest type` == "Other interested" & ano_concurso != 2014 | 
-           ano_concurso == 2014 & `Contest type` != "Other interested" & grepl('Segundo', rptpro_nombre_concurso)
-         )%>%
-  group_by(ano_concurso, `Contest type`)%>%
-  mutate(min_awarded_score = min(rptpro_puntaje, na.rm = T))%>%
-  filter(!duplicated(paste0(pmax(ano_concurso, `Contest type`), pmin(ano_concurso, `Contest type`))))%>%
-  select(ano_concurso, `Contest type`, min_awarded_score)
-score_cutoffs
-
-
-landcover_rejected <- readRDS(paste0(clean_data_dir, "/landcover_rejected.rds"))%>%
-  mutate(Plantation = Pine + Eucalyptus,
-         Forest = Plantation + Native)
-
-landcover_enrolled <- readRDS(paste0(clean_data_dir, 
-                                    "/landcover_enrolled_rol.rds"
-                                     ))%>%
-  mutate(Plantation = Pine + Eucalyptus,
-         Forest = Plantation + Native)
-
-landcover_cols <- c("Forest", "Plantation", "Urban", "Water", "Grassland/Ag", "Pine", "Native", "Bare", "Shrubland", "Eucalyptus","Orchard/Ag" , "pixels_count")
-
-enrolled_props <- landcover_enrolled %>%
-  inner_join(property_df, by = c("rptpro_id", "rptpre_id", "rptpro_ano"))%>%
-  rowid_to_column(var = "my_ID")%>%
-  rename(score = rptpro_puntaje,
-         region = rptpre_region,
-         ano_concurso = rptpro_ano,
-         Comuna = rptpre_comuna,
-         objectivo_manejo = rptpro_objetivo_manejo)%>%
-  inner_join(score_cutoffs, by = c("Contest type", "ano_concurso"))%>%
-  filter(`Contest type` == "Other interested" & ano_concurso != 2014 | 
-           ano_concurso == 2014 & `Contest type` != "Other interested" & grepl('Segundo', rptpro_nombre_concurso)
-  )%>%
-  mutate(score_centered = score - min_awarded_score,
-         Awarded = TRUE)%>%
-  rename(Superficie = rptpro_superficie, 
-         `Monto Solicitado` = rptpro_monto_total)%>%
-  select(score_centered, Awarded, my_ID, score, region, `Contest type`, objectivo_manejo, ano_concurso, Comuna, 
-         received_bonus, submitted_management_plan, Superficie, `Monto Solicitado`,
-         landcover_cols, matches("2000"), matches("2001"))
-  
-  
-ggplot(data = enrolled_props, aes(x = score_centered)) +
-  geom_vline(xintercept = 0, linetype = "dashed")+
-  geom_histogram() +
-  theme_minimal()
-         
-
-rejected_props <- landcover_rejected %>%
-  inner_join(no_asignados_all %>% rename(Postlcn = `Postulación`, ano_concurso = `Año Concurso`)
-                                                   , by = c("Postlcn", "Comuna", "ano_concurso")
-)%>%
-  rowid_to_column(var = "my_ID")%>%
-  rename(score = Puntaje,
-         region = Región,
-         objectivo_manejo = `Objetivo Manejo`)%>%
-  select(my_ID, score, region, `Contest type`, objectivo_manejo, ano_concurso, Comuna, 
-         Superficie, `Monto Solicitado`,
-         landcover_cols, matches("2000"), matches("2001"))%>%
-  inner_join(score_cutoffs, by = c("Contest type", "ano_concurso"))%>%
-  mutate(score_centered = score - min_awarded_score,
-         Awarded = FALSE)
-
-score_anomaly <- rejected_props %>% filter(score_centered > 0)
-
-ggplot(data = rejected_props, aes(x = score_centered)) +
-  geom_vline(xintercept = 0, linetype = "dashed")+
-  geom_histogram() +
-  theme_minimal()
-
-
-score_discontinuity_df <- bind_rows(rejected_props, 
-                                    enrolled_props)%>%
-  mutate(across(landcover_cols, ~ . / pixels_count, .names = "pct_{col}"),
-         share_Native = ifelse(Forest>0, Native / Forest, 0),
-         share_Plantation = ifelse(Forest>0, Plantation / Forest, 0),
-         share_Pine = ifelse(Forest>0, Pine / Forest, 0),
-         share_Euc = ifelse(Forest>0, Eucalyptus / Forest, 0)
-  )
+score_discontinuity_df <- readRDS(paste0(clean_data_dir, "/score_discontinuity_data.rds"))
 
 test_density <- rddensity(score_discontinuity_df$score_centered, c = 0)
 summary(test_density)
 
+test_density_pval <- test_density$test$p_jk
+
 plot_density_test <- rdplotdensity(rdd = test_density,
                                    X = score_discontinuity_df$score_centered,
                                    type = "both")
+
+plot_density_test$Estplot + 
+  annotate(geom="text", x=-10, y=0.0425, label = paste0("p-value: ", round(test_density_pval, digits = 3)))+xlab("Centered score")
+
+ggsave(filename = paste0(fig_dir, "/density_test_plot.png"), width = 6, height = 5, units='in')
 
 ggplot(score_discontinuity_df, aes(x = score_centered, y = Awarded, color = Awarded)) +
   # Make points small and semi-transparent since there are lots of them
@@ -130,23 +46,21 @@ ggplot(score_discontinuity_df, aes(x = score_centered, y = Awarded, color = Awar
   # Add labels
   labs(x = "Centered score", y = "Awarded") +
   # Turn off the color legend, since it's redundant
-  guides(color = FALSE)
+  guides(color = FALSE)+
+  theme_minimal()
 
-
+ggsave(filename = paste0(fig_dir, "/sharp_discontinuity.png"), width = 7, height = 5, units='in')
 
 
 
 analysis_df <- score_discontinuity_df %>%
-  mutate(years_since_contest = 2021 - ano_concurso,
-         area_ha = pixels_count*0.0225,
-  )%>%
   filter(received_bonus == 1 | Awarded == FALSE)
 
 
 
 
 
-plot_bw = 10
+plot_bw = 5
 
 conditionalMean_quantile <- analysis_df %>%
   filter(between(score_centered, -plot_bw, plot_bw))%>%
@@ -175,6 +89,8 @@ se_show = T
     theme_minimal()+
     xlim(-plot_bw, plot_bw)
   Native
+  ggsave(filename = paste0(fig_dir, "/Native_condmean.png"), width = 7, height = 5, units='in')
+  
   
   Eucalyptus <- ggplot() +
     geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 1, color = "black") +
@@ -186,10 +102,11 @@ se_show = T
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
     geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
     geom_vline(xintercept = 0) +
-    labs(x = "Centered score", y = "Eucalyptus forest")+
+    labs(x = "Centered score", y = "Eucalyptus")+
     theme_minimal()+
     xlim(-plot_bw, plot_bw)
   Eucalyptus
+  ggsave(filename = paste0(fig_dir, "/Eucalyptus_condmean.png"), width = 7, height = 5, units='in')
   
   Pine <- ggplot() +
     geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Pine), size = 2.5, alpha = 1, color = "black") +
@@ -201,14 +118,31 @@ se_show = T
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
     geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
     geom_vline(xintercept = 0) +
-    labs(x = "Centered score", y = "Pine forest")+
+    labs(x = "Centered score", y = "Pine")+
     theme_minimal()+
     xlim(-plot_bw, plot_bw)
   Pine
-
-
-
-main_outcomes <- c("Native", "Plantation", "Pine", "Eucalyptus")
+  ggsave(filename = paste0(fig_dir, "/Pine_condmean.png"), width = 7, height = 5, units='in')
+  
+  Plantation <- ggplot() +
+    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Plantation), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = analysis_df %>% filter(between(Plantation, min(conditionalMean_quantile$Plantation), max(conditionalMean_quantile$Plantation))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+    # Add a line based on a linear model
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Plantation, color = Awarded), se = se_show, alpha = 0.2) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Plantation, color = Awarded), se = se_show, alpha = 0.2) +
+    # Add a line based on conditional mean 
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Plantation, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Plantation, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_vline(xintercept = 0) +
+    labs(x = "Centered score", y = "Plantation")+
+    theme_minimal()+
+    xlim(-plot_bw, plot_bw)
+  Plantation
+  ggsave(filename = paste0(fig_dir, "/Plantation_condmean.png"), width = 7, height = 5, units='in')
+  
+  
+main_outcomes <- c("Native", "Plantation", "Pine", "Eucalyptus", "Forest"
+                   )
 
 preferred_bw = "optimal"
 preferred_method = "conventional"
@@ -243,6 +177,8 @@ for(o in main_outcomes){
     rd$coef,
     rd$se,
     rd$pv,
+    "Obs" = sum(rd$N),
+    "eff_obs" = sum(rd$N_h),
     "bandwidth" = rd_bw,
     "bandwidth_method" = "optimal",
     "method" = c("conventional", "bias-corrected", "robust")
@@ -261,6 +197,8 @@ for(o in main_outcomes){
     rd2$coef,
     rd2$se,
     rd2$pv,
+    "Obs" = sum(rd2$N),
+    "eff_obs" = sum(rd2$N_h),
     "bandwidth" = rd2_bw,
     "bandwidth_method" = "2 x optimal",
     "method" = c("conventional", "bias-corrected", "robust")
@@ -287,10 +225,12 @@ table(rd_results$outcome)
 
 bw_order <- c("optimal", "2 x optimal")
 method_order <- c("conventional", "bias-corrected",  "robust")
+spec_chart_outcomes <- c("Native", "Plantation")
 
 spec_results <- rd_results %>%
   group_by(outcome)%>%
-  arrange(match(outcome, main_outcomes)
+  filter(outcome %in% spec_chart_outcomes)%>%
+  arrange(match(outcome, spec_chart_outcomes)
           , match(bandwidth_method, bw_order)
           , match(method, method_order)
           )%>%
@@ -305,20 +245,22 @@ rd_spec_results <- spec_results %>%
   )%>%
   pivot_wider(names_from = method, values_from = true, values_fill = FALSE)%>%
   pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
-  select(estimate, se, everything(), - pval, - bandwidth
+  select(estimate, se, everything(), - pval, - bandwidth, - Obs, - eff_obs
          )%>%
   select(-outcome)%>%
   as.data.frame()
 
 
-par(oma=c(1,0,1,1))
-
 Labels = list("Method:" = method_order,
               "Bandwidth:" = bw_order)
 
+
+png(filename = paste0(fig_dir, "/schart_main.png"), width = 6, height = 5, units='in', res = 400)
+par(oma=c(1,0,1,1))
+
 schart(rd_spec_results, 
        labels = Labels,
-       index.est = 1, index.se=2, col.est = c("black", "royalblue"),
+       index.est = 1, index.se=2, col.est = c("black", "royalblue"), col.est2=c("grey80","grey80"),
        ci= c(.9, .95),
        n = 6,
        highlight = preferred_rows, 
@@ -327,11 +269,10 @@ schart(rd_spec_results,
        axes = FALSE
 ) # make some room at the bottom
 text(x=3 , y=6100, "Native", col="black", font=2)
-text(x=10.5 , y=6100, "Plantation", col="black", font=2)
-text(x=17.5 , y=6100, "Pine", col="black", font=2)
-text(x=24.5 , y=6100, "Eucalyptus", col="black", font=2)
+text(x=10 , y=6100, "Plantation", col="black", font=2)
 
-  
+# Close the png file
+dev.off()
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Covariate continuity and pre-treatment plantation/native spec chart
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -362,11 +303,15 @@ for(o in cov_outcomes){
                  , covs = my_covs
   )
   
+  rd_bw = rd$bws[1]
+  
   cov_results <- data.frame(
     "outcome" = o,
     rd$coef,
     rd$se,
     rd$pv,
+    "Obs" = sum(rd$N),
+    "eff_obs" = sum(rd$N_h),
     "bandwidth" = rd_bw,
     "bandwidth_method" = "optimal",
     "method" = c("conventional", "bias-corrected", "robust")
@@ -389,9 +334,6 @@ preferred_cov_results <- cov_results %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 placebo_analysis_df <- score_discontinuity_df %>%
-  mutate(years_since_contest = 2021 - ano_concurso,
-         area_ha = pixels_count*0.0225,
-  )%>%
   filter(received_bonus == 0 | Awarded == FALSE)
 
 placebo_results <- data.frame()
@@ -416,12 +358,16 @@ for(o in main_outcomes){
                  , covs = my_covs
   )
   
+  rd_bw = rd$bws[1]
+  
   placebo_results <- data.frame(
     "outcome" = o,
     rd$coef,
     rd$se,
     rd$pv,
+    "Obs" = sum(rd$N),
     "bandwidth" = rd_bw,
+    "eff_obs" = sum(rd$N_h),
     "bandwidth_method" = "optimal",
     "method" = c("conventional", "bias-corrected", "robust")
   )%>%
@@ -436,3 +382,103 @@ placebo_results <- placebo_results %>%
 preferred_placebo_results <- placebo_results %>%
   filter(bandwidth_method == preferred_bw,
          method == preferred_method)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+######
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+library(janitor)
+paper_outcomes_main <- c("Native", "Plantation", "Pine", "Eucalyptus")
+
+paper_results_main <- preferred_results %>%
+  filter(outcome %in% paper_outcomes_main)%>%
+  arrange(match(outcome, paper_outcomes_main))%>%
+  mutate(
+    stars = ifelse(between(abs(estimate/se), 1.645, 1.96), "*",
+                   ifelse(between(abs(estimate/se), 1.96, 2.58), "**",
+                          ifelse(abs(estimate/se) >= 2.58, "***", "")
+                   )
+    )
+  )%>%
+  mutate_at(vars(estimate, se, bandwidth), ~ round(., digits = 3))%>%
+  mutate(se = paste0("(", se, ")"),
+         estimate = paste0(estimate, stars))%>%
+  select(outcome, estimate, se, bandwidth, eff_obs)%>%
+  t() %>%
+  row_to_names(row_number = 1) %>%
+  as.data.frame()
+row.names(paper_results_main) <- c("LATE", " ", "Optimal bandwidth", "Effective # obs.")
+
+kbl(paper_results_main,
+    #format = "latex",
+    booktabs = T,
+   # caption = "",
+   # col.names = c("Canopy", "Loss (Acres/year)", "Gain (Acres/year)"),
+    align = c("l", "c", "c", "c"),
+    label = "results-score-main"
+)%>%
+  kableExtra::row_spec(2, hline_after = TRUE)%>%
+  add_header_above(c(" " = 1, "Outcome" = 4))%>%
+  footnote(general = "* p<0.1, ** p<0.05, *** p<0.01")%>%
+  kable_styling(latex_options = c("hold_position"))#%>% 
+#  kableExtra::save_kable(paste0(results_dir, "/results_score_main.tex"))
+
+
+cov_outcomes <- c("Superficie", "Monto Solicitado", "area_ha", "Water"
+                  , "Plantation_2001", "Forest_2001" 
+)
+cov_names <- c("Subsidy area (ha)", "Subsidy amount (UTM)", "Property area (ha)", "Water"
+                  , "Plantation forest (2001)", "Native forest (2001)" 
+)
+
+
+paper_results_cov <- preferred_cov_results %>%
+  filter(outcome %in% cov_outcomes)%>%
+  arrange(match(outcome, cov_outcomes))%>%
+  mutate(
+    stars = ifelse(between(abs(estimate/se), 1.645, 1.96), "*",
+                   ifelse(between(abs(estimate/se), 1.96, 2.58), "**",
+                          ifelse(abs(estimate/se) >= 2.58, "***", "")
+                   )
+    )
+  )%>%
+  mutate(lower = round(estimate - 1.96*se, digits = 3),
+         upper = round(estimate + 1.96*se, digits = 3),
+         ci = paste0("[", lower, ", ", upper, "]"))%>%
+  mutate_at(vars(estimate, se, bandwidth), ~ round(., digits = 3))%>%
+  mutate(estimate = paste0(estimate, stars),
+         outcome = c(cov_names, outcome)[match(outcome, c(cov_outcomes, outcome))])%>%
+  select(outcome, estimate, pval, ci, bandwidth, eff_obs)
+
+kbl(paper_results_cov,
+    #  format = "latex",
+    booktabs = T,
+    row.names = FALSE,
+    # caption = "",
+     col.names = c("Variable", "RD estimate", "p-value", "Conf. Int.", "MSE-optimal BW", "Eff. # Obs."),
+    align = c("l", "c", "c", "c", "c", "c"),
+    label = "results-score-covs"
+)%>%
+  kableExtra::row_spec(2, hline_after = TRUE)%>%
+ # add_header_above(c(" " = 1, "Outcome" = 6))%>%
+  footnote(general = "* p<0.1, ** p<0.05, *** p<0.01")%>%
+  kable_styling(latex_options = c("hold_position"))#%>% 
+ # kableExtra::save_kable(paste0(results_dir, "/results_score_covs.tex"))
+
+
+paper_results_placebo <- preferred_placebo_results %>%
+  filter(outcome %in% paper_outcomes_main)%>%
+  arrange(match(outcome, paper_outcomes_main))%>%
+  mutate(
+    stars = ifelse(between(abs(estimate/se), 1.645, 1.96), "*",
+                   ifelse(between(abs(estimate/se), 1.96, 2.58), "**",
+                          ifelse(abs(estimate/se) >= 2.58, "***", "")
+                   )
+    )
+  )%>%
+  mutate(lower = round(estimate - 1.96*se, digits = 3),
+          upper = round(estimate + 1.96*se, digits = 3),
+          ci = paste0("[", lower, ", ", upper, "]"))%>%
+  mutate_at(vars(estimate, se, bandwidth), ~ round(., digits = 3))%>%
+  mutate(estimate = paste0(estimate, stars),
+         outcome = c(cov_names, outcome)[match(outcome, c(cov_outcomes, outcome))])%>%
+  select(outcome, estimate, pval, ci, bandwidth, eff_obs)
