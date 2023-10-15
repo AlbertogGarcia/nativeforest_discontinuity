@@ -212,7 +212,6 @@ main_outcomes <- c("Native", "Plantation", "Pine", "Eucalyptus")
 
 preferred_bw = "optimal"
 preferred_method = "conventional"
-preferred_kernel = "triangular"
 
 results <- data.frame()
 for(o in main_outcomes){
@@ -232,11 +231,9 @@ for(o in main_outcomes){
    , this_df$Crop_2000
   )
   
-  kernel = preferred_kernel
   
   rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                       , covs = my_covs
-                 , kernel = kernel
   )
   
   rd_bw = rd$bws[1]
@@ -248,15 +245,13 @@ for(o in main_outcomes){
     rd$pv,
     "bandwidth" = rd_bw,
     "bandwidth_method" = "optimal",
-    "method" = c("conventional", "bias-corrected", "robust"),
-    "kernel" = kernel
+    "method" = c("conventional", "bias-corrected", "robust")
   )%>%
     rbind(results)
   
   
   rd2 <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                  , covs = my_covs
-                 , kernel = kernel
                  , h = rd_bw*2
   )
   rd2_bw = rd2$bws[1]
@@ -268,12 +263,13 @@ for(o in main_outcomes){
     rd2$pv,
     "bandwidth" = rd2_bw,
     "bandwidth_method" = "2 x optimal",
-    "method" = c("conventional", "bias-corrected", "robust"),
-    "kernel" = kernel
+    "method" = c("conventional", "bias-corrected", "robust")
   )%>%
     rbind(results)
   
 }
+
+
 
 rd_results <- results %>%
   rename(estimate = 2,
@@ -282,8 +278,7 @@ rd_results <- results %>%
 
 preferred_results <- rd_results %>%
   filter(bandwidth_method == preferred_bw,
-         method == preferred_method,
-         kernel == preferred_kernel)
+         method == preferred_method)
 
 
 source("analysis/schart.R")
@@ -292,7 +287,6 @@ table(rd_results$outcome)
 
 bw_order <- c("optimal", "2 x optimal")
 method_order <- c("conventional", "bias-corrected",  "robust")
-
 
 spec_results <- rd_results %>%
   group_by(outcome)%>%
@@ -303,8 +297,7 @@ spec_results <- rd_results %>%
   ungroup
 
 preferred_rows <- which(spec_results$bandwidth_method == preferred_bw &
-                          spec_results$method == preferred_method &
-                          spec_results$kernel == preferred_kernel)
+                          spec_results$method == preferred_method)
 
 rd_spec_results <- spec_results %>%
   mutate(true = TRUE,
@@ -313,7 +306,7 @@ rd_spec_results <- spec_results %>%
   pivot_wider(names_from = method, values_from = true, values_fill = FALSE)%>%
   pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
   select(estimate, se, everything(), - pval, - bandwidth
-         , - kernel)%>%
+         )%>%
   select(-outcome)%>%
   as.data.frame()
 
@@ -367,7 +360,6 @@ for(o in cov_outcomes){
   
   rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                  , covs = my_covs
-                 , kernel = kernel
   )
   
   cov_results <- data.frame(
@@ -377,8 +369,7 @@ for(o in cov_outcomes){
     rd$pv,
     "bandwidth" = rd_bw,
     "bandwidth_method" = "optimal",
-    "method" = c("conventional", "bias-corrected", "robust"),
-    "kernel" = kernel
+    "method" = c("conventional", "bias-corrected", "robust")
   )%>%
     rbind(cov_results)
 }
@@ -390,8 +381,7 @@ cov_results <- cov_results %>%
 
 preferred_cov_results <- cov_results %>%
   filter(bandwidth_method == preferred_bw,
-         method == preferred_method,
-         kernel == preferred_kernel)
+         method == preferred_method)
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -424,7 +414,6 @@ for(o in main_outcomes){
   
   rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                  , covs = my_covs
-                 , kernel = kernel
   )
   
   placebo_results <- data.frame(
@@ -434,8 +423,7 @@ for(o in main_outcomes){
     rd$pv,
     "bandwidth" = rd_bw,
     "bandwidth_method" = "optimal",
-    "method" = c("conventional", "bias-corrected", "robust"),
-    "kernel" = kernel
+    "method" = c("conventional", "bias-corrected", "robust")
   )%>%
     rbind(placebo_results)
 }
@@ -447,5 +435,4 @@ placebo_results <- placebo_results %>%
 
 preferred_placebo_results <- placebo_results %>%
   filter(bandwidth_method == preferred_bw,
-         method == preferred_method,
-         kernel == preferred_kernel)
+         method == preferred_method)
