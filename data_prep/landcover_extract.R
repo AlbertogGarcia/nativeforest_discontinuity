@@ -25,6 +25,11 @@ graesser_2000_rast <- terra::rast(paste0(my_data_dir, "/data/graesser_lc/AnnualM
 graesser_class_number <- c(1, 111, 124, 131, 138, 144, 152, 176, 195)
 graesser_class_name <- c("Crop", "Water", "Development", "Bare", "Plantations", "Trees", "Shrubs", "Grassland", "Wetland") 
 
+lu2001_rast <- terra::rast(paste0(my_data_dir, "/data/lu_2001/lu_2001.tif"))
+terra::freq(lu2001_rast)
+lu2001_class_number <- c("Forest", "Plantation", "Shrub", "Pasture and ag", "Water", "Urban", "Temporary bare soil", "Permanent bare soil", "Snow/ice", "No data")
+lu2001_class_name <- c("Forest", "Plantation", "Shrub", "PastureAg", "Water", "Urban", "Bare", "Snow", "nodata") 
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Extract landcover for rejected properties
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -87,8 +92,14 @@ graesser_enrolled_rol <- extract_landcover(enrolled_matched_rol,
                                             2000,
                                             id_cols = c("rptpro_id", "rptpre_id", "ROL", "rptpro_ano"), return_pix = FALSE)
 
+lu_enrolled_rol <- extract_landcover(enrolled_matched_rol, 
+                                           lu2001_rast, lu2001_class_number, lu2001_class_name, 
+                                           2001,
+                                           id_cols = c("rptpro_id", "rptpre_id", "ROL", "rptpro_ano"), return_pix = FALSE)
+
 extracted_enrolled_rol <- lee_enrolled_rol %>%
-  left_join(graesser_enrolled_rol, by = c("ID", "rptpro_id", "rptpre_id", "ROL", "rptpro_ano"))
+  left_join(graesser_enrolled_rol, by = c("ID", "rptpro_id", "rptpre_id", "ROL", "rptpro_ano"))%>%
+  left_join(lu_enrolled_rol, by = c("ID", "rptpro_id", "rptpre_id", "ROL", "rptpro_ano"))
 
 export(extracted_enrolled_rol, paste0(clean_data_dir, "/landcover_enrolled_rol.rds"))
 
@@ -108,8 +119,14 @@ graesser_enrolled <- extract_landcover(enrolled_matched_main,
                                            2000,
                                            id_cols = c("rptpro_id", "rptpre_id", "rptpro_ano", "polyarea"), return_pix = FALSE)
 
+lu_enrolled <- extract_landcover(enrolled_matched_main, 
+                                 lu2001_rast, lu2001_class_number, lu2001_class_name, 
+                                 2001,
+                                       id_cols = c("rptpro_id", "rptpre_id", "rptpro_ano", "polyarea"), return_pix = FALSE)
+
 extracted_enrolled <- lee_enrolled %>%
-  left_join(graesser_enrolled, by = c("ID", "rptpro_id", "rptpre_id", "rptpro_ano", "polyarea"))
+  left_join(graesser_enrolled, by = c("ID", "rptpro_id", "rptpre_id", "rptpro_ano", "polyarea"))%>%
+  left_join(lu_enrolled, by = c("ID", "rptpro_id", "rptpre_id", "rptpro_ano", "polyarea"))
 
 export(extracted_enrolled, paste0(clean_data_dir, "/landcover_enrolled.rds"))
 
@@ -130,7 +147,13 @@ graesser_rejected <- extract_landcover(no_asignados_matched %>% rename(ano_concu
                                            2000,
                                            id_cols = c("Postlcn", "ROL", "Comuna", "ano_concurso"), return_pix = FALSE)
 
+lu_rejected <- extract_landcover(no_asignados_matched %>% rename(ano_concurso = `AñCncrs`), 
+                                       lu2001_rast, lu2001_class_number, lu2001_class_name, 
+                                       2001,
+                                       id_cols = c("Postlcn", "ROL", "Comuna", "ano_concurso"), return_pix = FALSE)
+
 extracted_rejected <- lee_rejected %>%
-  left_join(graesser_rejected, by = c("ID", "Postlcn", "ROL", "Comuna", "ano_concurso"))
+  left_join(graesser_rejected, by = c("ID", "Postlcn", "ROL", "Comuna", "ano_concurso"))%>%
+  left_join(lu_rejected, by = c("ID", "Postlcn", "ROL", "Comuna", "ano_concurso"))
 
 export(extracted_rejected, paste0(clean_data_dir, "/landcover_rejected.rds"))

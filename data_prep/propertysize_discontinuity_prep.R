@@ -38,7 +38,9 @@ enrolled_props <- landcover_enrolled %>%
          Comuna = rptpre_comuna,
          objectivo_manejo = rptpro_objetivo_manejo)%>%
   select(size_centered, size_cutoff, below_cutoff, propertysize_reported, polyarea, my_ID, region, `Contest type`, objectivo_manejo, ano_concurso, Comuna, received_bonus, submitted_management_plan, 
-         landcover_cols, matches("2000"))
+         landcover_cols, matches("2000"))%>%
+  mutate(polyarea_centered = polyarea - size_cutoff,
+         poly_below_cutoff = polyarea <= size_cutoff)
 
 
 ggplot(enrolled_props, aes(x = size_centered, y = Native, color = `Contest type`)) +
@@ -51,12 +53,23 @@ ggplot(enrolled_props, aes(x = size_centered, y = Native, color = `Contest type`
   labs(x = "Property size", y = "Native", color = "Contest")+
   xlim(-100, 100)+ylim(0, 20000)
 
+ggplot(data = enrolled_props %>% filter(between(size_centered, -5, 5)))+
+  geom_histogram(aes(x = size_centered), fill = "orange")+
+  geom_histogram(aes(x = polyarea_centered), fill = "black", alpha = 0.5)+
+  theme_minimal()+
+  xlim(-30, 30)
+
+ggplot(data = enrolled_props %>% filter(received_bonus == 1)
+       %>% filter(between(size_centered, -5, 5)))+
+  geom_histogram(aes(x = size_centered), fill = "orange")+
+  geom_histogram(aes(x = polyarea_centered), fill = "black", alpha = 0.5)+
+  theme_minimal()+
+  xlim(-30, 30)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Fuzzy RDD using reported property size
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 analysis_df <- enrolled_props %>%
-  filter(size_cutoff == 200)%>%
   filter(submitted_management_plan == 1)
 
 outcomes <- c("Forest", "Eucalyptus", "Pine", "Native"
@@ -99,6 +112,238 @@ for(o in outcomes){
   
   
   rd2 <- rdrobust(y = this_df$out, x = this_df$size_centered, c = 0
+                  , covs = my_covs
+                  , h = rd_bw*2
+                  , fuzzy = this_df$smallholder
+  )
+  rd2_bw = rd2$bws[1]
+  
+  results <- data.frame(
+    "outcome" = o,
+    rd2$coef,
+    rd2$se,
+    rd2$pv,
+    "bandwidth" = rd2_bw,
+    "bandwidth_method" = "2 x optimal",
+    "method" = c("conventional", "bias-corrected", "robust")
+  )%>%
+    rbind(results)
+  
+  
+}
+
+rd_results <- results %>%
+  rename(estimate = 2,
+         se = 3,
+         pval = 4)
+
+source("analysis/schart.R")
+
+table(rd_results$outcome)
+
+spec_chart_outcomes <- c("Plantation", "Native")
+bw_order <- c("optimal", "2 x optimal")
+method_order <- c("bias-corrected", "conventional", "robust")
+
+rd_spec_results <- rd_results %>%
+  filter(outcome %in% spec_chart_outcomes)%>%
+  mutate(true = TRUE,
+         trueb = TRUE
+  )%>%
+  group_by(outcome)%>%
+  arrange(match(outcome, spec_chart_outcomes)
+          , match(bandwidth_method, bw_order)
+          , match(method, method_order)
+  )%>%
+  ungroup%>%
+  pivot_wider(names_from = method, values_from = true, values_fill = FALSE)%>%
+  pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
+  select(estimate, se, everything(), - pval, - bandwidth, - outcome)%>%
+  as.data.frame()
+
+
+my_labels <- c(
+  "Method:" = c("optimal", "2 x optimal"),
+  "Bandwidth:" = c("bias-corrected", "conventional", "robust")
+)
+
+par(oma=c(1,0,1,1))
+
+
+schart(rd_spec_results,labels = my_labels, index.est = 1, index.se=2, col.est = c("black", "royalblue"),
+       n = 6,
+       bg.dot=c("black", "grey95", "white", "royalblue"),
+       col.dot=c("black", "grey95", "white", "royalblue"),
+       axes = FALSE
+) # make some room at the bottom
+text(x=3 , y=5300, "Plantation", col="black", font=2)
+text(x=10 , y=5300, "Native", col="black", font=2)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Fuzzy RDD using reported property size, censoring based on CIREN size
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+analysis_df <- enrolled_props %>%
+  filter(submitted_management_plan == 1)%>%
+  mutate(CIREN_greaterthancuttoff = polyarea > size_cutoff,
+         drop = ifelse(CIREN_greaterthancuttoff & `Contest type` == "Smallholder", 1, 0))%>%
+  filter(drop == 0 )
+
+outcomes <- c("Forest", "Eucalyptus", "Pine", "Native"
+)
+
+
+results <- data.frame()
+for(o in outcomes){
+  
+  this_df <- analysis_df %>%
+    rename(out = o)%>%
+    mutate(smallholder = ifelse(`Contest type` == "Smallholder", 1, 0))
+  
+  
+  my_covs<- cbind(
+    this_df$Development_2000
+    , this_df$Grassland_2000
+    , this_df$Water_2000
+    , this_df$Crop_2000
+    , this_df$Trees_2000
+  )
+  
+  rd <- rdrobust(y = this_df$out, x = this_df$size_centered, c = 0
+                 , covs = my_covs
+                 , fuzzy = this_df$smallholder
+  )
+  
+  rd_bw = rd$bws[1]
+  
+  results <- data.frame(
+    "outcome" = o,
+    rd$coef,
+    rd$se,
+    rd$pv,
+    "bandwidth" = rd_bw,
+    "bandwidth_method" = "optimal",
+    "method" = c("conventional", "bias-corrected", "robust")
+  )%>%
+    rbind(results)
+  
+  
+  rd2 <- rdrobust(y = this_df$out, x = this_df$size_centered, c = 0
+                  , covs = my_covs
+                  , h = rd_bw*2
+                  , fuzzy = this_df$smallholder
+  )
+  rd2_bw = rd2$bws[1]
+  
+  results <- data.frame(
+    "outcome" = o,
+    rd2$coef,
+    rd2$se,
+    rd2$pv,
+    "bandwidth" = rd2_bw,
+    "bandwidth_method" = "2 x optimal",
+    "method" = c("conventional", "bias-corrected", "robust")
+  )%>%
+    rbind(results)
+  
+  
+}
+
+rd_results <- results %>%
+  rename(estimate = 2,
+         se = 3,
+         pval = 4)
+
+source("analysis/schart.R")
+
+table(rd_results$outcome)
+
+spec_chart_outcomes <- c("Plantation", "Native")
+bw_order <- c("optimal", "2 x optimal")
+method_order <- c("bias-corrected", "conventional", "robust")
+
+rd_spec_results <- rd_results %>%
+  filter(outcome %in% spec_chart_outcomes)%>%
+  mutate(true = TRUE,
+         trueb = TRUE
+  )%>%
+  group_by(outcome)%>%
+  arrange(match(outcome, spec_chart_outcomes)
+          , match(bandwidth_method, bw_order)
+          , match(method, method_order)
+  )%>%
+  ungroup%>%
+  pivot_wider(names_from = method, values_from = true, values_fill = FALSE)%>%
+  pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
+  select(estimate, se, everything(), - pval, - bandwidth, - outcome)%>%
+  as.data.frame()
+
+
+my_labels <- c(
+  "Method:" = c("optimal", "2 x optimal"),
+  "Bandwidth:" = c("bias-corrected", "conventional", "robust")
+)
+
+par(oma=c(1,0,1,1))
+
+
+schart(rd_spec_results,labels = my_labels, index.est = 1, index.se=2, col.est = c("black", "royalblue"),
+       n = 6,
+       bg.dot=c("black", "grey95", "white", "royalblue"),
+       col.dot=c("black", "grey95", "white", "royalblue"),
+       axes = FALSE
+) # make some room at the bottom
+text(x=3 , y=5300, "Plantation", col="black", font=2)
+text(x=10 , y=5300, "Native", col="black", font=2)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Fuzzy RDD using CIREN size
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+analysis_df <- enrolled_props %>%
+  filter(size_cutoff == 200)%>%
+  filter(received_bonus == 1 & abs(polyarea - propertysize_reported) <= 30)
+
+outcomes <- c("Forest", "Eucalyptus", "Pine", "Native"
+)
+
+
+results <- data.frame()
+for(o in outcomes){
+  
+  this_df <- analysis_df %>%
+    rename(out = o)%>%
+    mutate(smallholder = ifelse(`Contest type` == "Smallholder", 1, 0))
+  
+  
+  my_covs<- cbind(
+    this_df$Development_2000
+    , this_df$Grassland_2000
+    , this_df$Water_2000
+    , this_df$Crop_2000
+    , this_df$Trees_2000
+  )
+  
+  rd <- rdrobust(y = this_df$out, x = this_df$polyarea_centered, c = 0
+                 , covs = my_covs
+                 , fuzzy = this_df$smallholder
+  )
+  
+  rd_bw = rd$bws[1]
+  
+  results <- data.frame(
+    "outcome" = o,
+    rd$coef,
+    rd$se,
+    rd$pv,
+    "bandwidth" = rd_bw,
+    "bandwidth_method" = "optimal",
+    "method" = c("conventional", "bias-corrected", "robust")
+  )%>%
+    rbind(results)
+  
+  
+  rd2 <- rdrobust(y = this_df$out, x = this_df$polyarea_centered, c = 0
                   , covs = my_covs
                   , h = rd_bw*2
                   , fuzzy = this_df$smallholder

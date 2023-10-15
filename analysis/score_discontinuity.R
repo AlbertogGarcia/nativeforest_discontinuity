@@ -1,8 +1,20 @@
 library(tidyverse)
 library(ggplot2)
 library(rdrobust)
+library(rddensity)
 
 clean_data_dir <- here::here("data_prep", "clean")
+
+palette <- list("white" = "#FAFAFA",
+                "light_grey" = "#d9d9d9",
+                "dark" = "#0c2230",
+                "red" = "#ed195a",
+                "blue" = "#1c86ee",
+                "dark_blue" = "#00008b",
+                "green" = "#00ab5b",
+                "dark_green" = "#496F5D",
+                "gold" = "#DAA520",
+                "purple" = "#880ED4")
 
 select <- dplyr::select
 
@@ -58,8 +70,11 @@ enrolled_props <- landcover_enrolled %>%
   )%>%
   mutate(score_centered = score - min_awarded_score,
          Awarded = TRUE)%>%
-  select(score_centered, Awarded, my_ID, score, region, `Contest type`, objectivo_manejo, ano_concurso, Comuna, received_bonus, submitted_management_plan, 
-         landcover_cols, matches("2000"))
+  rename(Superficie = rptpro_superficie, 
+         `Monto Solicitado` = rptpro_monto_total)%>%
+  select(score_centered, Awarded, my_ID, score, region, `Contest type`, objectivo_manejo, ano_concurso, Comuna, 
+         received_bonus, submitted_management_plan, Superficie, `Monto Solicitado`,
+         landcover_cols, matches("2000"), matches("2001"))
   
   
 ggplot(data = enrolled_props, aes(x = score_centered)) +
@@ -77,7 +92,8 @@ rejected_props <- landcover_rejected %>%
          region = Región,
          objectivo_manejo = `Objetivo Manejo`)%>%
   select(my_ID, score, region, `Contest type`, objectivo_manejo, ano_concurso, Comuna, 
-         landcover_cols, matches("2000"))%>%
+         Superficie, `Monto Solicitado`,
+         landcover_cols, matches("2000"), matches("2001"))%>%
   inner_join(score_cutoffs, by = c("Contest type", "ano_concurso"))%>%
   mutate(score_centered = score - min_awarded_score,
          Awarded = FALSE)
@@ -91,11 +107,7 @@ ggplot(data = rejected_props, aes(x = score_centered)) +
 
 
 score_discontinuity_df <- bind_rows(rejected_props, 
-                                    enrolled_props %>% filter(
-                                    #  submitted_management_plan ==1
-                                      received_bonus == 1
-                                                              )
-                                    )%>%
+                                    enrolled_props)%>%
   mutate(across(landcover_cols, ~ . / pixels_count, .names = "pct_{col}"),
          share_Native = ifelse(Forest>0, Native / Forest, 0),
          share_Plantation = ifelse(Forest>0, Plantation / Forest, 0),
@@ -103,7 +115,12 @@ score_discontinuity_df <- bind_rows(rejected_props,
          share_Euc = ifelse(Forest>0, Eucalyptus / Forest, 0)
   )
 
+test_density <- rddensity(score_discontinuity_df$score_centered, c = 0)
+summary(test_density)
 
+plot_density_test <- rdplotdensity(rdd = test_density,
+                                   X = score_discontinuity_df$score_centered,
+                                   type = "both")
 
 ggplot(score_discontinuity_df, aes(x = score_centered, y = Awarded, color = Awarded)) +
   # Make points small and semi-transparent since there are lots of them
@@ -116,71 +133,90 @@ ggplot(score_discontinuity_df, aes(x = score_centered, y = Awarded, color = Awar
   guides(color = FALSE)
 
 
+
+
+
 analysis_df <- score_discontinuity_df %>%
-  mutate(years_since_contest = 2021 - ano_concurso)
-
-
-bw = 8
-
-se_show = F
-se_lm_show = T
-
-Native <- ggplot(analysis_df, aes(x = score_centered, y = Native, color = Awarded)) +
-  geom_point(size = 0.75, alpha = 0.25) +
-  # Add a line based on a linear model for the people scoring 0 or less
-  geom_smooth(data = filter(analysis_df, score_centered <= 0), se = se_show) +
-  # Add a line based on a linear model for the people scoring more than 0
-  geom_smooth(data = filter(analysis_df, score_centered > 0), se = se_show) +
-  # Add a line based on a linear model for the people scoring 0 or less
-  geom_smooth(data = filter(analysis_df, score_centered <= 0), method = "lm", linetype = "dashed", se = se_lm_show) +
-  # Add a line based on a linear model for the people scoring more than 0
-  geom_smooth(data = filter(analysis_df, score_centered > 0), method = "lm", linetype = "dashed", se = se_lm_show) +
-  geom_vline(xintercept = 0) +
-  labs(x = "Centered score", y = "Native", color = "Awarded")+
-  theme_minimal()+
-  xlim(-bw, bw) 
-Native
-
-Native_share <- ggplot(analysis_df, aes(x = score_centered, y = share_Native, color = Awarded)) +
-  geom_point(size = 0.75, alpha = 0.25) +
-  # Add a line based on a linear model for the people scoring 0 or less
-  geom_smooth(data = filter(analysis_df, score_centered <= 0), se = se_show) +
-  # Add a line based on a linear model for the people scoring more than 0
-  geom_smooth(data = filter(analysis_df, score_centered > 0), se = se_show) +
-  # Add a line based on a linear model for the people scoring 0 or less
-  geom_smooth(data = filter(analysis_df, score_centered <= 0), method = "lm", linetype = "dashed", se = se_lm_show) +
-  # Add a line based on a linear model for the people scoring more than 0
-  geom_smooth(data = filter(analysis_df, score_centered > 0), method = "lm", linetype = "dashed", se = se_lm_show) +
-  geom_vline(xintercept = 0) +
-  labs(x = "Centered score", y = "Share of Forest that is Native", color = "Awarded")+
-  theme_minimal()+
-  xlim(-bw, bw) 
-Native_share
-
-Grassland <- ggplot(analysis_df, aes(x = score_centered, y = `Grassland/Ag`, color = Awarded)) +
-  geom_point(size = 0.75, alpha = 0.25) +
-  # Add a line based on a linear model for the people scoring 0 or less
-  geom_smooth(data = filter(analysis_df, score_centered <= 0), se = se_show) +
-  # Add a line based on a linear model for the people scoring more than 0
-  geom_smooth(data = filter(analysis_df, score_centered > 0), se = se_show) +
-  # Add a line based on a linear model for the people scoring 0 or less
-  geom_smooth(data = filter(analysis_df, score_centered <= 0), method = "lm", linetype = "dashed", se = se_lm_show) +
-  # Add a line based on a linear model for the people scoring more than 0
-  geom_smooth(data = filter(analysis_df, score_centered > 0), method = "lm", linetype = "dashed", se = se_lm_show) +
-  geom_vline(xintercept = 0) +
-  labs(x = "Centered score", y = "Grassland", color = "Awarded")+
-  theme_minimal()+
-  xlim(-bw, bw) 
-Grassland
+  mutate(years_since_contest = 2021 - ano_concurso,
+         area_ha = pixels_count*0.0225,
+  )%>%
+  filter(received_bonus == 1 | Awarded == FALSE)
 
 
 
-outcomes <- c("Forest", "Plantation", "Native", "Pine", "Eucalyptus", "Grassland/Ag", "Orchard/Ag", "Bare"
-              )
 
+
+plot_bw = 10
+
+conditionalMean_quantile <- analysis_df %>%
+  filter(between(score_centered, -plot_bw, plot_bw))%>%
+  mutate(bin = ntile(score_centered, n=25)) %>% 
+  group_by(bin) %>% 
+  summarise(score_centered = mean(score_centered, na.rm = T), 
+            Native = mean(Native, na.rm = T), 
+            Plantation = mean(Plantation, na.rm = T),
+            Forest = mean(Forest, na.rm = T),
+            Pine = mean(Pine, na.rm = T),
+            Eucalyptus = mean(Eucalyptus, na.rm = T))
+
+se_show = T
+
+  Native <- ggplot() +
+    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Native), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = analysis_df %>% filter(between(Native, min(conditionalMean_quantile$Native), max(conditionalMean_quantile$Native))), aes(x = score_centered, y = Native), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+    # Add a line based on a linear model
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
+    # Add a line based on conditional mean 
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_vline(xintercept = 0) +
+    labs(x = "Centered score", y = "Native forest")+
+    theme_minimal()+
+    xlim(-plot_bw, plot_bw)
+  Native
+  
+  Eucalyptus <- ggplot() +
+    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = analysis_df %>% filter(between(Eucalyptus, min(conditionalMean_quantile$Eucalyptus), max(conditionalMean_quantile$Eucalyptus))), aes(x = score_centered, y = Eucalyptus), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+    # Add a line based on a linear model
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
+    # Add a line based on conditional mean 
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_vline(xintercept = 0) +
+    labs(x = "Centered score", y = "Eucalyptus forest")+
+    theme_minimal()+
+    xlim(-plot_bw, plot_bw)
+  Eucalyptus
+  
+  Pine <- ggplot() +
+    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Pine), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = analysis_df %>% filter(between(Pine, min(conditionalMean_quantile$Pine), max(conditionalMean_quantile$Pine))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+    # Add a line based on a linear model
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
+    # Add a line based on conditional mean 
+    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+    geom_vline(xintercept = 0) +
+    labs(x = "Centered score", y = "Pine forest")+
+    theme_minimal()+
+    xlim(-plot_bw, plot_bw)
+  Pine
+
+
+
+main_outcomes <- c("Plantation", "Native", "Pine", "Eucalyptus")
+
+preferred_bw = "optimal"
+preferred_method = "conventional"
+preferred_kernel = "triangular"
 
 results <- data.frame()
-for(o in outcomes){
+for(o in main_outcomes){
+  
 
   this_df <- analysis_df %>%
     rename(out = o)%>%
@@ -189,15 +225,18 @@ for(o in outcomes){
   
   my_covs<- cbind(
     this_df$years_since_contest
-    , this_df$Trees_2000
-   # , this_df$Development_2000
-   # , this_df$Grassland_2000
-   # , this_df$Water_2000
-   # , this_df$Crop_2000
+   , this_df$Trees_2000
+   , this_df$Development_2000
+   , this_df$Grassland_2000
+   , this_df$Water_2000
+   , this_df$Crop_2000
   )
+  
+  kernel = preferred_kernel
   
   rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                       , covs = my_covs
+                 , kernel = kernel
   )
   
   rd_bw = rd$bws[1]
@@ -209,13 +248,15 @@ for(o in outcomes){
     rd$pv,
     "bandwidth" = rd_bw,
     "bandwidth_method" = "optimal",
-    "method" = c("conventional", "bias-corrected", "robust")
+    "method" = c("conventional", "bias-corrected", "robust"),
+    "kernel" = kernel
   )%>%
     rbind(results)
   
   
   rd2 <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                  , covs = my_covs
+                 , kernel = kernel
                  , h = rd_bw*2
   )
   rd2_bw = rd2$bws[1]
@@ -227,10 +268,10 @@ for(o in outcomes){
     rd2$pv,
     "bandwidth" = rd2_bw,
     "bandwidth_method" = "2 x optimal",
-    "method" = c("conventional", "bias-corrected", "robust")
+    "method" = c("conventional", "bias-corrected", "robust"),
+    "kernel" = kernel
   )%>%
     rbind(results)
-  
   
 }
 
@@ -239,72 +280,170 @@ rd_results <- results %>%
          se = 3,
          pval = 4)
 
+preferred_results <- rd_results %>%
+  filter(bandwidth_method == preferred_bw,
+         method == preferred_method,
+         kernel == preferred_kernel)
+
+
 source("analysis/schart.R")
 
 table(rd_results$outcome)
 
-spec_chart_outcomes <- c("Pine", "Eucalyptus", "Native")
+spec_chart_outcomes <- c("Pine", "Eucalyptus", "Plantation", "Native")
 bw_order <- c("optimal", "2 x optimal")
 method_order <- c("bias-corrected", "conventional", "robust")
 
-rd_spec_results <- rd_results %>%
-  filter(outcome %in% spec_chart_outcomes)%>%
+
+spec_results <- rd_results %>%
   mutate(true = TRUE,
          trueb = TRUE
          )%>%
   group_by(outcome)%>%
-  arrange(match(outcome, spec_chart_outcomes)
-          , match(bandwidth_method, bw_order)
+  arrange(match(bandwidth_method, bw_order)
           , match(method, method_order)
           )%>%
   ungroup%>%
   pivot_wider(names_from = method, values_from = true, values_fill = FALSE)%>%
   pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
-  select(estimate, se, everything(), - pval, - bandwidth, - outcome)%>%
+  select(estimate, se, everything(), - pval, - bandwidth
+         , - kernel)%>%
   as.data.frame()
 
+rd_spec_results <- spec_results %>% 
+  filter(outcome %in% spec_chart_outcomes)%>%
+  arrange(match(outcome, spec_chart_outcomes))%>%
+  select(-outcome)
 
-my_labels <- c(
-  "Method:" = c("optimal", "2 x optimal"),
-  "Bandwidth:" = c("bias-corrected", "conventional", "robust")
-)
 
 par(oma=c(1,0,1,1))
 
+Labels = list("Method:" = method_order,
+              "Bandwidth:" = bw_order)
 
-schart(rd_spec_results,labels = my_labels, index.est = 1, index.se=2, col.est = c("black", "royalblue"),
+schart(rd_spec_results, 
+       labels = Labels,
+       index.est = 1, index.se=2, col.est = c("black", "royalblue"),
+       ci= c(.9, .95),
        n = 6,
+       highlight = preferred_rows, 
        bg.dot=c("black", "grey95", "white", "royalblue"),
        col.dot=c("black", "grey95", "white", "royalblue"),
        axes = FALSE
 ) # make some room at the bottom
-text(x=3 , y=5300, "Pine", col="black", font=2)
-text(x=10 , y=5300, "Eucalyptus", col="black", font=2)
-text(x=17.5 , y=5300, "Native", col="black", font=2)
+text(x=3 , y=5500, "Pine", col="black", font=2)
+text(x=10 , y=6100, "Eucalyptus", col="black", font=2)
+text(x=17 , y=5500, "Plantation", col="black", font=2)
+text(x=24.5 , y=6100, "Native", col="black", font=2)
 
   
-Native_coeff_plot <- ggplot(rd_results %>% filter(outcome == "Native"),
-                            aes(x = bandwidth, color = notes, ymin = estimate - 1.96*se, ymax = estimate + 1.96*se))+
-  geom_point(position = position_dodge(width=0.9), aes(y = estimate))+
-  geom_errorbar(position = position_dodge(width=0.9), width = 05)+
-  theme_minimal()
-Native_coeff_plot
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Covariate continuity and pre-treatment plantation/native spec chart
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-my_covs<- cbind(
-  analysis_df$years_since_contest
-  , analysis_df$Trees_2000
-  # , analysis_df$Development_2000
-  # , analysis_df$Grassland_2000
-  # , analysis_df$Water_2000
-  # , analysis_df$Crop_2000
-)
+cov_outcomes <- c("Superficie", "Monto Solicitado", "area_ha", "Water"
+                        , "Plantation_2001", "Forest_2001" 
+                        )
 
-asdf <- rdplot(y = analysis_df$Native, x = analysis_df$score_centered, c = 0
-               , covs = my_covs
-)
+cov_results <- data.frame()
+for(o in cov_outcomes){
+  
+  
+  this_df <- analysis_df %>%
+    rename(out = o)%>%
+    drop_na(score_centered)
+  
+  
+  my_covs<- cbind(
+    this_df$years_since_contest
+    , this_df$Trees_2000
+    , this_df$Development_2000
+    , this_df$Grassland_2000
+    , this_df$Water_2000
+    , this_df$Crop_2000
+  )
+  
+  rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
+                 , covs = my_covs
+                 , kernel = kernel
+  )
+  
+  cov_results <- data.frame(
+    "outcome" = o,
+    rd$coef,
+    rd$se,
+    rd$pv,
+    "bandwidth" = rd_bw,
+    "bandwidth_method" = "optimal",
+    "method" = c("conventional", "bias-corrected", "robust"),
+    "kernel" = kernel
+  )%>%
+    rbind(cov_results)
+}
 
-asdf$rdplot +
-  labs(x = "Centered score", y = "Native")+
-  xlim(-6, 8)+
-  ylim(0, 40000)
+cov_results <- cov_results %>%
+  rename(estimate = 2,
+         se = 3,
+         pval = 4)
 
+preferred_cov_results <- cov_results %>%
+  filter(bandwidth_method == preferred_bw,
+         method == preferred_method,
+         kernel == preferred_kernel)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Placebo using those that do not submit management plan
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+placebo_analysis_df <- score_discontinuity_df %>%
+  mutate(years_since_contest = 2021 - ano_concurso,
+         area_ha = pixels_count*0.0225,
+  )%>%
+  filter(received_bonus == 0 | Awarded == FALSE)
+
+placebo_results <- data.frame()
+for(o in main_outcomes){
+  
+  
+  this_df <- placebo_analysis_df %>%
+    rename(out = o)%>%
+    drop_na(score_centered)
+  
+  
+  my_covs<- cbind(
+    this_df$years_since_contest
+    , this_df$Trees_2000
+    , this_df$Development_2000
+    , this_df$Grassland_2000
+    , this_df$Water_2000
+    , this_df$Crop_2000
+  )
+  
+  rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
+                 , covs = my_covs
+                 , kernel = kernel
+  )
+  
+  placebo_results <- data.frame(
+    "outcome" = o,
+    rd$coef,
+    rd$se,
+    rd$pv,
+    "bandwidth" = rd_bw,
+    "bandwidth_method" = "optimal",
+    "method" = c("conventional", "bias-corrected", "robust"),
+    "kernel" = kernel
+  )%>%
+    rbind(placebo_results)
+}
+
+placebo_results <- placebo_results %>%
+  rename(estimate = 2,
+         se = 3,
+         pval = 4)
+
+preferred_placebo_results <- placebo_results %>%
+  filter(bandwidth_method == preferred_bw,
+         method == preferred_method,
+         kernel == preferred_kernel)
