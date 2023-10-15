@@ -208,7 +208,7 @@ se_show = T
 
 
 
-main_outcomes <- c("Plantation", "Native", "Pine", "Eucalyptus")
+main_outcomes <- c("Native", "Plantation", "Pine", "Eucalyptus")
 
 preferred_bw = "optimal"
 preferred_method = "conventional"
@@ -290,30 +290,32 @@ source("analysis/schart.R")
 
 table(rd_results$outcome)
 
-spec_chart_outcomes <- c("Pine", "Eucalyptus", "Plantation", "Native")
 bw_order <- c("optimal", "2 x optimal")
-method_order <- c("bias-corrected", "conventional", "robust")
+method_order <- c("conventional", "bias-corrected",  "robust")
 
 
 spec_results <- rd_results %>%
-  mutate(true = TRUE,
-         trueb = TRUE
-         )%>%
   group_by(outcome)%>%
-  arrange(match(bandwidth_method, bw_order)
+  arrange(match(outcome, main_outcomes)
+          , match(bandwidth_method, bw_order)
           , match(method, method_order)
           )%>%
-  ungroup%>%
+  ungroup
+
+preferred_rows <- which(spec_results$bandwidth_method == preferred_bw &
+                          spec_results$method == preferred_method &
+                          spec_results$kernel == preferred_kernel)
+
+rd_spec_results <- spec_results %>%
+  mutate(true = TRUE,
+         trueb = TRUE
+  )%>%
   pivot_wider(names_from = method, values_from = true, values_fill = FALSE)%>%
   pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
   select(estimate, se, everything(), - pval, - bandwidth
          , - kernel)%>%
+  select(-outcome)%>%
   as.data.frame()
-
-rd_spec_results <- spec_results %>% 
-  filter(outcome %in% spec_chart_outcomes)%>%
-  arrange(match(outcome, spec_chart_outcomes))%>%
-  select(-outcome)
 
 
 par(oma=c(1,0,1,1))
@@ -331,10 +333,10 @@ schart(rd_spec_results,
        col.dot=c("black", "grey95", "white", "royalblue"),
        axes = FALSE
 ) # make some room at the bottom
-text(x=3 , y=5500, "Pine", col="black", font=2)
-text(x=10 , y=6100, "Eucalyptus", col="black", font=2)
-text(x=17 , y=5500, "Plantation", col="black", font=2)
-text(x=24.5 , y=6100, "Native", col="black", font=2)
+text(x=3 , y=6100, "Native", col="black", font=2)
+text(x=10.5 , y=6100, "Plantation", col="black", font=2)
+text(x=17.5 , y=6100, "Pine", col="black", font=2)
+text(x=24.5 , y=6100, "Eucalyptus", col="black", font=2)
 
   
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
