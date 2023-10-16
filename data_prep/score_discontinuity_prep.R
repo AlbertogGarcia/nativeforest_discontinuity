@@ -97,8 +97,10 @@ ggplot(data = rejected_props, aes(x = score_centered)) +
 
 
 score_discontinuity_df <- bind_rows(rejected_props, 
-                                    enrolled_props)
+                                    enrolled_props)%>%
+  mutate(across(landcover_cols, ~ . / pixels_count, .names = "pct_{col}"),
+         years_since_contest = 2021 - ano_concurso,
+         area_ha = pixels_count*0.0225
+  )
 
-#  mutate(across(landcover_cols, ~ . / pixels_count, .names = "pct_{col}"),
-         
 export(score_discontinuity_df, paste0(clean_data_dir, "/score_discontinuity_data.rds"))
