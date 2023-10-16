@@ -97,14 +97,8 @@ ggplot(data = rejected_props, aes(x = score_centered)) +
 
 
 score_discontinuity_df <- bind_rows(rejected_props, 
-                                    enrolled_props)%>%
-  mutate(across(landcover_cols, ~ . / pixels_count, .names = "pct_{col}"),
-         share_Native = ifelse(Forest>0, Native / Forest, 0),
-         share_Plantation = ifelse(Forest>0, Plantation / Forest, 0),
-         share_Pine = ifelse(Forest>0, Pine / Forest, 0),
-         share_Euc = ifelse(Forest>0, Eucalyptus / Forest, 0),
-         years_since_contest = 2021 - ano_concurso,
-         area_ha = pixels_count*0.0225
-  )
+                                    enrolled_props)
 
+#  mutate(across(landcover_cols, ~ . / pixels_count, .names = "pct_{col}"),
+         
 export(score_discontinuity_df, paste0(clean_data_dir, "/score_discontinuity_data.rds"))

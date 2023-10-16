@@ -1,6 +1,7 @@
 library(tidyverse)
 library(ggplot2)
 library(janitor)
+library(kableExtra)
 library(rdrobust)
 library(rddensity)
 
@@ -90,7 +91,7 @@ se_show = T
 
 Native <- ggplot() +
   geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Native), size = 2.5, alpha = 0.7, color = "black") +
-  geom_point(data = analysis_df %>% filter(between(Native, min(conditionalMean_quantile$Native), max(conditionalMean_quantile$Native))), aes(x = score_centered, y = Native), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+  geom_point(data = analysis_df %>% filter(between(Native, min(conditionalMean_bin$Native), max(conditionalMean_bin$Native))), aes(x = score_centered, y = Native), size = .75, shape = 21, alpha = .5, color = palette$dark) +
   # Add a line based on a linear model
   geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
   geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
@@ -108,7 +109,7 @@ Native
   
   Eucalyptus <- ggplot() +
     geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 0.7, color = "black") +
-    geom_point(data = analysis_df %>% filter(between(Eucalyptus, min(conditionalMean_quantile$Eucalyptus), max(conditionalMean_quantile$Eucalyptus))), aes(x = score_centered, y = Eucalyptus), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+    geom_point(data = analysis_df %>% filter(between(Eucalyptus, min(conditionalMean_bin$Eucalyptus), max(conditionalMean_bin$Eucalyptus))), aes(x = score_centered, y = Eucalyptus), size = .75, shape = 21, alpha = .5, color = palette$dark) +
     # Add a line based on a linear model
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
     geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
@@ -121,10 +122,11 @@ Native
     scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
     xlim(-plot_bw, plot_bw)
   Eucalyptus
+  ggsave(filename = paste0(fig_dir, "/Eucalyptus_condmean.png"), width = 7, height = 5, units='in')
   
   Pine <- ggplot() +
     geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Pine), size = 2.5, alpha = 0.7, color = "black") +
-    geom_point(data = analysis_df %>% filter(between(Pine, min(conditionalMean_quantile$Pine), max(conditionalMean_quantile$Pine))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+    geom_point(data = analysis_df %>% filter(between(Pine, min(conditionalMean_bin$Pine), max(conditionalMean_bin$Pine))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
     # Add a line based on a linear model
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
     geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
@@ -137,29 +139,16 @@ Native
     scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
     xlim(-plot_bw, plot_bw)
   Pine
-  
-  Plantation <- ggplot() +
-    geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Plantation), size = 2.5, alpha = 1, color = "black") +
-    geom_point(data = analysis_df %>% filter(between(Plantation, min(conditionalMean_quantile$Plantation), max(conditionalMean_quantile$Plantation))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
-    # Add a line based on a linear model
-    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Plantation, color = Awarded), se = se_show, alpha = 0.2) +
-    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Plantation, color = Awarded), se = se_show, alpha = 0.2) +
-    # Add a line based on conditional mean 
-    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Plantation, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Plantation, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_vline(xintercept = 0) +
-    labs(x = "Centered score", y = "Plantation")+
-    theme_minimal()+
-    scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
-    xlim(-plot_bw, plot_bw)
-  Plantation
+  ggsave(filename = paste0(fig_dir, "/Pine_condmean.png"), width = 7, height = 5, units='in')
   
   
-main_outcomes <- c("Native", "Plantation", "Pine", "Eucalyptus", "Forest"
-                   )
+  
+main_outcomes <- c("Native", "Eucalyptus", "Pine", "Plantation", "Forest")
+
 bw_options <- c("mserd", # MSE-optimal bandwidth
                 "cerrd" # CER-optimal bandwidth
                 )
+
 
 preferred_bw = "MSE-optimal"
 preferred_method = "conventional"
@@ -183,6 +172,7 @@ for(o in main_outcomes){
   )
   
   for(b in bw_options){
+    
     
     rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                    , covs = my_covs
@@ -223,7 +213,7 @@ for(o in main_outcomes){
       "method" = c("conventional", "bias-corrected", "robust")
     )%>%
       rbind(results)
-  
+    
   
   }
   
@@ -247,13 +237,15 @@ table(rd_results$outcome)
 
 bw_order <- c("MSE-optimal", "2 x MSE-optimal")
 method_order <- c("conventional", "bias-corrected",  "robust")
-spec_chart_order <- c("Native", "Plantation")
+spec_chart_order <- c("Native", "Plantation"
+                      ,"Eucalyptus", "Pine"
+                      )
 
 spec_results <- rd_results %>%
   group_by(outcome)%>%
-  filter(outcome %in% spec_chart_outcomes)%>%
+  filter(outcome %in% spec_chart_order)%>%
   filter(bandwidth_method %in% bw_order)%>%
-  arrange(match(outcome, spec_chart_outcomes)
+  arrange(match(outcome, spec_chart_order)
           , match(bandwidth_method, bw_order)
           , match(method, method_order)
           )%>%
@@ -270,7 +262,6 @@ rd_spec_results <- spec_results %>%
   pivot_wider(names_from = bandwidth_method, values_from = trueb, values_fill = FALSE)%>%
   select(estimate, se, everything(), - pval, - bandwidth, - Obs, - eff_obs
          )%>%
-  select(-outcome)%>%
   as.data.frame()
 
 
@@ -278,10 +269,11 @@ Labels = list("Method:" = method_order,
               "Bandwidth:" = bw_order)
 
 
-png(filename = paste0(fig_dir, "/schart_main.png"), width = 6, height = 5, units='in', res = 400)
+png(filename = paste0(fig_dir, "/schart_main.png"), width = 7, height = 5.5, units='in', res = 400)
 par(oma=c(1,0,1,1))
 
-schart(rd_spec_results, 
+schart(rd_spec_results %>% select(-outcome)
+       , 
        labels = Labels,
        index.est = 1, index.se=2, col.est = c("black", "royalblue"), col.est2=c("grey80","grey80"),
        ci= c(.9, .95),
@@ -291,8 +283,10 @@ schart(rd_spec_results,
        col.dot=c("black", "grey95", "white", "royalblue"),
        axes = FALSE
 ) # make some room at the bottom
-text(x=3 , y=6100, "Native", col="black", font=2)
-text(x=10 , y=6100, "Plantation", col="black", font=2)
+text(x=3.5 , y=6100, "Native", col="black", font=2)
+text(x=10.5 , y=6100, "Plantation", col="black", font=2)
+text(x=17.5 , y=6100, "Eucalyptus", col="black", font=2)
+text(x=24.5 , y=6100, "Pine", col="black", font=2)
 
 # Close the png file
 dev.off()
@@ -302,6 +296,7 @@ dev.off()
 
 cov_outcomes <- c("Superficie", "Monto Solicitado", "area_ha", "Water"
                         , "Plantation_2001", "Forest_2001" 
+                  , "Grassland/Ag", "Orchard/Ag", "Bare", "Shrubland", "Urban"
                         )
 
 cov_results <- data.frame()
@@ -336,7 +331,7 @@ for(o in cov_outcomes){
     "Obs" = sum(rd$N),
     "eff_obs" = sum(rd$N_h),
     "bandwidth" = rd_bw,
-    "bandwidth_method" = "optimal",
+    "bandwidth_method" = "MSE-optimal",
     "method" = c("conventional", "bias-corrected", "robust")
   )%>%
     rbind(cov_results)
@@ -391,7 +386,7 @@ for(o in main_outcomes){
     "Obs" = sum(rd$N),
     "bandwidth" = rd_bw,
     "eff_obs" = sum(rd$N_h),
-    "bandwidth_method" = "optimal",
+    "bandwidth_method" = "MSE-optimal",
     "method" = c("conventional", "bias-corrected", "robust")
   )%>%
     rbind(placebo_results)
@@ -410,7 +405,12 @@ preferred_placebo_results <- placebo_results %>%
 ######
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-paper_outcomes_main <- c("Native", "Plantation", "Pine", "Eucalyptus")
+paper_outcomes_main <- c("Native", "Plantation", "Eucalyptus", "Pine")
+
+untreat_mean <- analysis_df %>% 
+  filter(Awarded == 0)%>% 
+  select(paper_outcomes_main) %>% 
+  summarize_at(vars(paper_outcomes_main), ~round(mean(.), digits = 2))
 
 paper_results_main <- preferred_results %>%
   filter(outcome %in% paper_outcomes_main)%>%
@@ -428,14 +428,15 @@ paper_results_main <- preferred_results %>%
   select(outcome, estimate, se, bandwidth, eff_obs)%>%
   t() %>%
   row_to_names(row_number = 1) %>%
+  rbind(untreat_mean)%>%
   as.data.frame()
-row.names(paper_results_main) <- c("LATE", " ", "Optimal bandwidth", "Effective # obs.")
+
+row.names(paper_results_main) <- c("LATE", " ", "Optimal bandwidth", "Effective # obs.", "Dep. var. mean")
 
 kbl(paper_results_main,
     #format = "latex",
     booktabs = T,
    # caption = "",
-   # col.names = c("Canopy", "Loss (Acres/year)", "Gain (Acres/year)"),
     align = c("l", "c", "c", "c"),
     label = "results-score-main"
 )%>%
