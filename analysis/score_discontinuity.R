@@ -1,5 +1,6 @@
 library(tidyverse)
 library(ggplot2)
+library(janitor)
 library(rdrobust)
 library(rddensity)
 
@@ -62,9 +63,21 @@ analysis_df <- score_discontinuity_df %>%
 
 plot_bw = 5
 
-conditionalMean_quantile <- analysis_df %>%
+# conditionalMean_quantile <- analysis_df %>%
+#   filter(between(score_centered, -plot_bw, plot_bw))%>%
+#   mutate(bin = ntile(score_centered, n=20)) %>% 
+#   group_by(bin) %>% 
+#   summarise(score_centered = mean(score_centered, na.rm = T), 
+#             Native = mean(Native, na.rm = T), 
+#             Plantation = mean(Plantation, na.rm = T),
+#             Forest = mean(Forest, na.rm = T),
+#             Pine = mean(Pine, na.rm = T),
+#             Eucalyptus = mean(Eucalyptus, na.rm = T))
+
+conditionalMean_bin <- analysis_df %>%
   filter(between(score_centered, -plot_bw, plot_bw))%>%
-  mutate(bin = ntile(score_centered, n=25)) %>% 
+  mutate(bin = cut(score_centered, breaks = plot_bw*2)
+         ) %>% 
   group_by(bin) %>% 
   summarise(score_centered = mean(score_centered, na.rm = T), 
             Native = mean(Native, na.rm = T), 
@@ -75,25 +88,26 @@ conditionalMean_quantile <- analysis_df %>%
 
 se_show = T
 
-  Native <- ggplot() +
-    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Native), size = 2.5, alpha = 1, color = "black") +
-    geom_point(data = analysis_df %>% filter(between(Native, min(conditionalMean_quantile$Native), max(conditionalMean_quantile$Native))), aes(x = score_centered, y = Native), size = .75, shape = 21, alpha = .5, color = palette$dark) +
-    # Add a line based on a linear model
-    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
-    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
-    # Add a line based on conditional mean 
-    geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_vline(xintercept = 0) +
-    labs(x = "Centered score", y = "Native forest")+
-    theme_minimal()+
-    xlim(-plot_bw, plot_bw)
-  Native
+Native <- ggplot() +
+  geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Native), size = 2.5, alpha = 0.7, color = "black") +
+  geom_point(data = analysis_df %>% filter(between(Native, min(conditionalMean_quantile$Native), max(conditionalMean_quantile$Native))), aes(x = score_centered, y = Native), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+  # Add a line based on a linear model
+  geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
+  geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), se = se_show, alpha = 0.2) +
+  # Add a line based on conditional mean 
+  geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Native, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_smooth(data = filter(analysis_df, score_centered > 0), aes(x = score_centered, y = Native, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_vline(xintercept = 0) +
+  labs(x = "Centered score", y = "Native")+
+  theme_minimal()+
+  scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
+  xlim(-plot_bw, plot_bw)
+Native
   ggsave(filename = paste0(fig_dir, "/Native_condmean.png"), width = 7, height = 5, units='in')
   
   
   Eucalyptus <- ggplot() +
-    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 0.7, color = "black") +
     geom_point(data = analysis_df %>% filter(between(Eucalyptus, min(conditionalMean_quantile$Eucalyptus), max(conditionalMean_quantile$Eucalyptus))), aes(x = score_centered, y = Eucalyptus), size = .75, shape = 21, alpha = .5, color = palette$dark) +
     # Add a line based on a linear model
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
@@ -104,12 +118,12 @@ se_show = T
     geom_vline(xintercept = 0) +
     labs(x = "Centered score", y = "Eucalyptus")+
     theme_minimal()+
+    scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
     xlim(-plot_bw, plot_bw)
   Eucalyptus
-  ggsave(filename = paste0(fig_dir, "/Eucalyptus_condmean.png"), width = 7, height = 5, units='in')
   
   Pine <- ggplot() +
-    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Pine), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Pine), size = 2.5, alpha = 0.7, color = "black") +
     geom_point(data = analysis_df %>% filter(between(Pine, min(conditionalMean_quantile$Pine), max(conditionalMean_quantile$Pine))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
     # Add a line based on a linear model
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
@@ -120,12 +134,12 @@ se_show = T
     geom_vline(xintercept = 0) +
     labs(x = "Centered score", y = "Pine")+
     theme_minimal()+
+    scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
     xlim(-plot_bw, plot_bw)
   Pine
-  ggsave(filename = paste0(fig_dir, "/Pine_condmean.png"), width = 7, height = 5, units='in')
   
   Plantation <- ggplot() +
-    geom_point(data = conditionalMean_quantile, aes(x = score_centered, y = Plantation), size = 2.5, alpha = 1, color = "black") +
+    geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Plantation), size = 2.5, alpha = 1, color = "black") +
     geom_point(data = analysis_df %>% filter(between(Plantation, min(conditionalMean_quantile$Plantation), max(conditionalMean_quantile$Plantation))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
     # Add a line based on a linear model
     geom_smooth(data = filter(analysis_df, score_centered <= 0), aes(x = score_centered, y = Plantation, color = Awarded), se = se_show, alpha = 0.2) +
@@ -136,15 +150,18 @@ se_show = T
     geom_vline(xintercept = 0) +
     labs(x = "Centered score", y = "Plantation")+
     theme_minimal()+
+    scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
     xlim(-plot_bw, plot_bw)
   Plantation
-  ggsave(filename = paste0(fig_dir, "/Plantation_condmean.png"), width = 7, height = 5, units='in')
   
   
 main_outcomes <- c("Native", "Plantation", "Pine", "Eucalyptus", "Forest"
                    )
+bw_options <- c("mserd", # MSE-optimal bandwidth
+                "cerrd" # CER-optimal bandwidth
+                )
 
-preferred_bw = "optimal"
+preferred_bw = "MSE-optimal"
 preferred_method = "conventional"
 
 results <- data.frame()
@@ -165,45 +182,50 @@ for(o in main_outcomes){
    , this_df$Crop_2000
   )
   
+  for(b in bw_options){
+    
+    rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
+                   , covs = my_covs
+                   , bwselect = b
+    )
+    
+    rd_bw = rd$bws[1]
+    
+    results <- data.frame(
+      "outcome" = o,
+      rd$coef,
+      rd$se,
+      rd$pv,
+      "Obs" = sum(rd$N),
+      "eff_obs" = sum(rd$N_h),
+      "bandwidth" = rd_bw,
+      "bandwidth_method" = ifelse(b == "mserd", "MSE-optimal", "CER-optimal"),
+      "method" = c("conventional", "bias-corrected", "robust")
+    )%>%
+      rbind(results)
+    
+    
+    rd2 <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
+                    , covs = my_covs
+                    , h = rd_bw*2
+    )
+    rd2_bw = rd2$bws[1]
+    
+    results <- data.frame(
+      "outcome" = o,
+      rd2$coef,
+      rd2$se,
+      rd2$pv,
+      "Obs" = sum(rd2$N),
+      "eff_obs" = sum(rd2$N_h),
+      "bandwidth" = rd2_bw,
+      "bandwidth_method" = paste0("2 x ", ifelse(b == "mserd", "MSE-optimal", "CER-optimal")),
+      "method" = c("conventional", "bias-corrected", "robust")
+    )%>%
+      rbind(results)
   
-  rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
-                      , covs = my_covs
-  )
   
-  rd_bw = rd$bws[1]
-  
-  results <- data.frame(
-    "outcome" = o,
-    rd$coef,
-    rd$se,
-    rd$pv,
-    "Obs" = sum(rd$N),
-    "eff_obs" = sum(rd$N_h),
-    "bandwidth" = rd_bw,
-    "bandwidth_method" = "optimal",
-    "method" = c("conventional", "bias-corrected", "robust")
-  )%>%
-    rbind(results)
-  
-  
-  rd2 <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
-                 , covs = my_covs
-                 , h = rd_bw*2
-  )
-  rd2_bw = rd2$bws[1]
-  
-  results <- data.frame(
-    "outcome" = o,
-    rd2$coef,
-    rd2$se,
-    rd2$pv,
-    "Obs" = sum(rd2$N),
-    "eff_obs" = sum(rd2$N_h),
-    "bandwidth" = rd2_bw,
-    "bandwidth_method" = "2 x optimal",
-    "method" = c("conventional", "bias-corrected", "robust")
-  )%>%
-    rbind(results)
+  }
   
 }
 
@@ -223,13 +245,14 @@ source("analysis/schart.R")
 
 table(rd_results$outcome)
 
-bw_order <- c("optimal", "2 x optimal")
+bw_order <- c("MSE-optimal", "2 x MSE-optimal")
 method_order <- c("conventional", "bias-corrected",  "robust")
-spec_chart_outcomes <- c("Native", "Plantation")
+spec_chart_order <- c("Native", "Plantation")
 
 spec_results <- rd_results %>%
   group_by(outcome)%>%
   filter(outcome %in% spec_chart_outcomes)%>%
+  filter(bandwidth_method %in% bw_order)%>%
   arrange(match(outcome, spec_chart_outcomes)
           , match(bandwidth_method, bw_order)
           , match(method, method_order)
@@ -386,7 +409,7 @@ preferred_placebo_results <- placebo_results %>%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ######
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-library(janitor)
+
 paper_outcomes_main <- c("Native", "Plantation", "Pine", "Eucalyptus")
 
 paper_results_main <- preferred_results %>%
