@@ -112,66 +112,6 @@ st_write(enrolled_match_rol %>% rename(pre_comuna = rptpre_comuna) %>% select(RO
          paste0(clean_data_dir, "/enrolled_match_rol.shp"),
          driver = "ESRI Shapefile")
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### spatial matches
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#stands
-rodal_df <- read_xlsx(paste0(my_data_dir, "/external_data/concurso_conaf/program/rodal.xlsx"))
-coordinadas_df <- read_xlsx(paste0(my_data_dir, "/external_data/concurso_conaf/program/coordinadas_predio.xlsx"))
-
-
-
-enrolled_coordinadas <- property_df %>%
-  left_join(coordinadas_df, by = "rptpre_id")%>%
-  left_join(rodal_df, by = "rptpre_id")%>%
-  mutate(datum = ifelse(is.na(rptro_datum), rptub_datum, rptro_datum),
-         easting = ifelse(is.na(rptro_este), rptub_este, rptro_este),
-         northing = ifelse(is.na(rptro_norte), rptub_norte, rptro_norte),
-         huso = ifelse(is.na(rptro_huso), rptub_huso, rptro_huso))%>%
-  crs_clean_fcn(.)%>%
-  st_transform(crs = st_crs(propiedadesrurales))%>%
-  select(ROL, rptpro_id, rptpre_id, rptpre_comuna, rptpre_superficie_predial, rptpro_ano)
-
-enrolled_match_spatial <- st_make_valid(
-  all_rural_props %>% filter(rol_prty_ciren == 1)
-  ) %>%
-  rename(ROL_poly = ROL)%>%
-  st_join(enrolled_coordinadas)%>%
-  mutate(area_diff = abs(polyarea-rptpre_superficie_predial),
-         match_mthd = "spatial",
-         match_prty = 0
-  )%>%
-  drop_na(rptpro_id)%>%
-  filter(stringdist(accents(tolower(rptpre_comuna)), desccomu, method = "dl") <= 1 )%>%
-  group_by(rptpre_id, ROL, rptpre_comuna)%>%
-  filter(area_diff == min(area_diff))%>%
-  filter(src_prty == max(src_prty))%>%
-  slice_head()
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### combining spatial and rol matches
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-bindnames <- c("ROL", "rptpro_id", "rptpre_id", "rptpre_comuna", "rptpro_ano", "area_diff", "match_prty", "polyarea")
-
-boundary_match <- rbind(enrolled_match_spatial %>% select(bindnames), 
-                        enrolled_match_rol %>% select(bindnames)
-                        ) 
-
-enrolled_match <- boundary_match %>%
-  group_by(rptpre_id, ROL, rptpre_comuna)%>%
-  filter(area_diff == min(area_diff) | match_prty == 1)%>%
-  filter(match_prty == max(match_prty))%>%
-  filter(area_diff == min(area_diff))%>%
-  slice_head()%>%
-  filter(area_diff <= 200)
-
-st_write(enrolled_match %>% rename(pre_comuna = rptpre_comuna) %>% select(ROL, rptpro_id, rptpre_id, pre_comuna, rptpro_ano, polyarea),
-         paste0(clean_data_dir, "/enrolled_match_main.shp"),
-         driver = "ESRI Shapefile")
-
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -231,3 +171,73 @@ st_write(no_asignados_match_rol,
          paste0(clean_data_dir, "/no_asignados_match_rol.shp"),
          driver = "ESRI Shapefile")
 
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### unmatched ROL ids for unawarded properties
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+no_asignados_unmatched <- rbind(no_asignados_Rol, no_asignados_ROL) %>%
+  anti_join(rbind(no_asignados_match_Rol, no_asignados_match_ROL), by = "ROL")
+
+
+write_csv(no_asignados_unmatched, paste0(clean_data_dir, "/no_asignados_unmatched.csv"))
+
+
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### spatial matches
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#stands
+rodal_df <- read_xlsx(paste0(my_data_dir, "/external_data/concurso_conaf/program/rodal.xlsx"))
+coordinadas_df <- read_xlsx(paste0(my_data_dir, "/external_data/concurso_conaf/program/coordinadas_predio.xlsx"))
+
+
+
+enrolled_coordinadas <- property_df %>%
+  left_join(coordinadas_df, by = "rptpre_id")%>%
+  left_join(rodal_df, by = "rptpre_id")%>%
+  mutate(datum = ifelse(is.na(rptro_datum), rptub_datum, rptro_datum),
+         easting = ifelse(is.na(rptro_este), rptub_este, rptro_este),
+         northing = ifelse(is.na(rptro_norte), rptub_norte, rptro_norte),
+         huso = ifelse(is.na(rptro_huso), rptub_huso, rptro_huso))%>%
+  crs_clean_fcn(.)%>%
+  st_transform(crs = st_crs(propiedadesrurales))%>%
+  select(ROL, rptpro_id, rptpre_id, rptpre_comuna, rptpre_superficie_predial, rptpro_ano)
+
+enrolled_match_spatial <- st_make_valid(
+  all_rural_props %>% filter(rol_prty_ciren == 1)
+) %>%
+  rename(ROL_poly = ROL)%>%
+  st_join(enrolled_coordinadas)%>%
+  mutate(area_diff = abs(polyarea-rptpre_superficie_predial),
+         match_mthd = "spatial",
+         match_prty = 0
+  )%>%
+  drop_na(rptpro_id)%>%
+  filter(stringdist(accents(tolower(rptpre_comuna)), desccomu, method = "dl") <= 1 )%>%
+  group_by(rptpre_id, ROL, rptpre_comuna)%>%
+  filter(area_diff == min(area_diff))%>%
+  filter(src_prty == max(src_prty))%>%
+  slice_head()
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### combining spatial and rol matches
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+bindnames <- c("ROL", "rptpro_id", "rptpre_id", "rptpre_comuna", "rptpro_ano", "area_diff", "match_prty", "polyarea")
+
+boundary_match <- rbind(enrolled_match_spatial %>% select(bindnames), 
+                        enrolled_match_rol %>% select(bindnames)
+) 
+
+enrolled_match <- boundary_match %>%
+  group_by(rptpre_id, ROL, rptpre_comuna)%>%
+  filter(area_diff == min(area_diff) | match_prty == 1)%>%
+  filter(match_prty == max(match_prty))%>%
+  filter(area_diff == min(area_diff))%>%
+  slice_head()%>%
+  filter(area_diff <= 200)
