@@ -1,6 +1,6 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# Author: Albert Garcia and Robert Heilmayr
-# Project: Chile reforestation
+# Author: Albert Garcia, Robert Heilmayr, Felipe Jordan, Brian Lee
+# Project: Chile discontinuity
 # Date: 8/1/23
 # Purpose: Creates a symlink from code directory to a directory storing project data
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

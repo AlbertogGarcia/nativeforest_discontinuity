@@ -48,7 +48,7 @@ ggplot(score_discontinuity_df, aes(x = score_centered, y = Awarded, color = Awar
   # Add labels
   labs(x = "Centered score", y = "Awarded") +
   # Turn off the color legend, since it's redundant
-  guides(color = FALSE)+
+  guides(color = FALSE, scale = "none")+
   theme_minimal()
 
 ggsave(filename = paste0(fig_dir, "/sharp_discontinuity.png"), width = 7, height = 5, units='in')
@@ -99,51 +99,51 @@ Native <- ggplot() +
 Native
   ggsave(filename = paste0(fig_dir, "/Native_condmean.png"), width = 7, height = 5, units='in')
   
-  Eucalyptus <- ggplot() +
-    geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 0.7, color = "black") +
-    geom_point(data = bonus_dta %>% filter(between(Eucalyptus, min(conditionalMean_bin$Eucalyptus), max(conditionalMean_bin$Eucalyptus))), aes(x = score_centered, y = Eucalyptus), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+Eucalyptus <- ggplot() +
+  geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Eucalyptus), size = 2.5, alpha = 0.7, color = "black") +
+  geom_point(data = bonus_dta %>% filter(between(Eucalyptus, min(conditionalMean_bin$Eucalyptus), max(conditionalMean_bin$Eucalyptus))), aes(x = score_centered, y = Eucalyptus), size = .75, shape = 21, alpha = .5, color = palette$dark) +
     # Add a line based on a linear model
-    geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
-    geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
+  geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
+  geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), se = se_show, alpha = 0.2) +
     # Add a line based on conditional mean 
-    geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_vline(xintercept = 0) +
-    labs(x = "Centered score", y = "Eucalyptus")+
-    theme_minimal()+
-    scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
-    xlim(-plot_bw, plot_bw)
-  Eucalyptus
-  ggsave(filename = paste0(fig_dir, "/Eucalyptus_condmean.png"), width = 7, height = 5, units='in')
+  geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Eucalyptus, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_vline(xintercept = 0) +
+  labs(x = "Centered score", y = "Eucalyptus")+
+  theme_minimal()+
+  scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
+  xlim(-plot_bw, plot_bw)
+Eucalyptus
+ggsave(filename = paste0(fig_dir, "/Eucalyptus_condmean.png"), width = 7, height = 5, units='in')
   
-  Pine <- ggplot() +
-    geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Pine), size = 2.5, alpha = 0.7, color = "black") +
-    geom_point(data = bonus_dta %>% filter(between(Pine, min(conditionalMean_bin$Pine), max(conditionalMean_bin$Pine))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
-    # Add a line based on a linear model
-    geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
-    geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
-    # Add a line based on conditional mean 
-    geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
-    geom_vline(xintercept = 0) +
-    labs(x = "Centered score", y = "Pine")+
-    theme_minimal()+
-    scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
-    xlim(-plot_bw, plot_bw)
-  Pine
-  ggsave(filename = paste0(fig_dir, "/Pine_condmean.png"), width = 7, height = 5, units='in')
+Pine <- ggplot() +
+  geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Pine), size = 2.5, alpha = 0.7, color = "black") +
+  geom_point(data = bonus_dta %>% filter(between(Pine, min(conditionalMean_bin$Pine), max(conditionalMean_bin$Pine))), aes(x = score_centered, y = Pine), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+  # Add a line based on a linear model
+  geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
+  geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), se = se_show, alpha = 0.2) +
+  # Add a line based on conditional mean 
+  geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Pine, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_vline(xintercept = 0) +
+  labs(x = "Centered score", y = "Pine")+
+  theme_minimal()+
+  scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
+  xlim(-plot_bw, plot_bw)
+Pine
+ggsave(filename = paste0(fig_dir, "/Pine_condmean.png"), width = 7, height = 5, units='in')
   
   
   
   
 main_outcomes <- c("Native", "Eucalyptus", "Pine", "Plantation", "Forest")
 
-bw_options <- c("mserd" # MSE-optimal bandwidth
-                )
+bw_options <- c("mserd") # MSE-optimal bandwidth
 
+my_kernel = "triangular"
 
 preferred_bw = "MSE-optimal"
-preferred_method = "conventional"
+preferred_method = "bias-corrected"
 
 results <- data.frame()
 for(dta in list(bonus_dta, neverbonus_dta, all_dta)){
@@ -162,6 +162,7 @@ for(dta in list(bonus_dta, neverbonus_dta, all_dta)){
       , this_df$Trees_2000
       , this_df$Development_2000
       , this_df$Grassland_2000
+      , this_df$Plantation_2001
       , this_df$Water_2000
       , this_df$Crop_2000
     )
@@ -169,9 +170,13 @@ for(dta in list(bonus_dta, neverbonus_dta, all_dta)){
     for(b in bw_options){
       
       
+      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      #### RDD w/ MSE optimal BW
+      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
       rd <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                      , covs = my_covs
                      , bwselect = b
+                     , kernel = my_kernel
       )
       
       rd_bw = rd$bws[1]
@@ -191,9 +196,14 @@ for(dta in list(bonus_dta, neverbonus_dta, all_dta)){
         rbind(results)
       
       
+      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      #### RDD w/ 2 x MSE optimal BW
+      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      
       rd2 <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
                       , covs = my_covs
                       , h = rd_bw*2
+                      , kernel = my_kernel
       )
       rd2_bw = rd2$bws[1]
       
@@ -211,6 +221,42 @@ for(dta in list(bonus_dta, neverbonus_dta, all_dta)){
       )%>%
         rbind(results)
       
+      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      #### Fuzzy RDD
+      #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      if(this_data_group == "All enrollees"){
+        
+        this_df <- this_df %>%
+          mutate(received_bonus = replace_na(received_bonus, 0))
+        
+        rd_fuzzy <- rdrobust(y = this_df$out, x = this_df$score_centered, c = 0
+                             , covs = my_covs
+                             , bwselect = b
+                             , fuzzy = this_df$received_bonus
+                             , kernel = my_kernel
+        )
+        rd_bw_fuzzy = rd_bw
+        
+        results <- data.frame(
+          "outcome" = o,
+          rd_fuzzy$coef,
+          rd_fuzzy$se,
+          rd_fuzzy$pv,
+          "Obs" = sum(rd_fuzzy$N),
+          "eff_obs" = sum(rd_fuzzy$N_h),
+          "bandwidth" = rd_bw_fuzzy,
+          "bandwidth_method" = ifelse(b == "mserd", "MSE-optimal", b),
+          "method" = c("conventional", "bias-corrected", "robust"),
+          "data_group" = "fuzzy"
+        )%>%
+          rbind(results)
+        
+      }
+      
+      
+      
+      
+      
       
     }
     
@@ -226,7 +272,8 @@ rd_results <- results %>%
 
 preferred_results <- rd_results %>%
   filter(bandwidth_method == preferred_bw,
-         method == preferred_method)
+         method == preferred_method
+         )
 
 
 source("analysis/schart.R")
@@ -322,13 +369,13 @@ schart(preferred_spec_results %>% select(-outcome)
        labels = Labels,
        index.est = 1, index.se=2, col.est = c("black", "royalblue"), col.est2=c("grey80","grey80"),
        ci= c(.9, .95),
-       n = 3,
+       n = 4,
        bg.dot=c("black", "grey95", "white", "royalblue"),
        col.dot=c("black", "grey95", "white", "royalblue"),
        axes = FALSE
 ) # make some room at the bottom
-text(x=2 , y=5200, "Native", col="black", font=2)
-text(x=6 , y=5200, "Plantation", col="black", font=2)
+text(x=2.5 , y=5500, "Native", col="black", font=2)
+text(x=7 , y=5500, "Plantation", col="black", font=2)
 
 # Close the png file
 dev.off()
@@ -339,11 +386,12 @@ dev.off()
 
 Native_bw <- rdbwselect(y = bonus_dta$Native, x = bonus_dta$score_centered, c = 0
                         , covs = cbind(
-                           bonus_dta$Trees_2000
-                          , bonus_dta$Development_2000
-                          , bonus_dta$Grassland_2000
-                          , bonus_dta$Water_2000
-                          , bonus_dta$Crop_2000
+                           this_df$Trees_2000
+                          , this_df$Development_2000
+                          , this_df$Grassland_2000
+                          , this_df$Plantation_2001
+                          , this_df$Water_2000
+                          , this_df$Crop_2000
                         ))$bws[1]
 
 Native_bonus_dta <- bonus_dta %>%
@@ -352,13 +400,13 @@ Native_bonus_dta <- bonus_dta %>%
   filter(between(score_centered, -Native_bw, Native_bw))
 
 RDD_parametric <- lm(Native ~ score_centered + Award + years_since_contest
-                     +Trees_2000+Development_2000+Grassland_2000+Water_2000+Crop_2000
+                     +Trees_2000+Development_2000+Grassland_2000+Plantation_2001+Water_2000+Crop_2000
                      , data = Native_bonus_dta
                      )
 summary(RDD_parametric)
 
 RDD_parametric_contestyear <- lm(Native ~ score_centered + Award*years_since_contest
-                     +Trees_2000+Development_2000+Grassland_2000+Water_2000+Crop_2000
+                     +Trees_2000+Development_2000+Grassland_2000+Plantation_2001+Water_2000+Crop_2000
                      , data = Native_bonus_dta)
 
 summary(RDD_parametric_contestyear)

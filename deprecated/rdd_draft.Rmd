@@ -1,5 +1,5 @@
 ---
-title: "Chapter 3: Big fish in the small pond: heaping, manipulation, and selection in Chile's Native Forest Law"
+title: "heaping, manipulation, and selection in Chile's Native Forest Law"
 author: "Alberto Garcia"
 date: "November 9th, 2021"
 output:
