@@ -7,7 +7,7 @@ library(rddensity)
 
 clean_data_dir <- here::here("data_prep", "clean")
 
-fig_dir <- here::here("score_figs")
+fig_dir <- here::here("figs")
 results_dir <- here::here("score_results")
 
 palette <- list("white" = "#FAFAFA",
