@@ -66,7 +66,7 @@ neverbonus_dta <- score_discontinuity_df %>%
 all_dta <- score_discontinuity_df %>%
   mutate(data_group = "All enrollees")
 
-plot_bw = 5
+plot_bw = 6
 
 conditionalMean_bin <- bonus_dta %>%
   filter(between(score_centered, -plot_bw, plot_bw))%>%
@@ -81,6 +81,22 @@ conditionalMean_bin <- bonus_dta %>%
             Eucalyptus = mean(Eucalyptus, na.rm = T))
 
 se_show = T
+
+Forest <- ggplot() +
+  geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Forest), size = 2.5, alpha = 0.7, color = "black") +
+  geom_point(data = bonus_dta %>% filter(between(Forest, min(conditionalMean_bin$Forest), max(conditionalMean_bin$Forest))), aes(x = score_centered, y = Forest), size = .75, shape = 21, alpha = .5, color = palette$dark) +
+  # Add a line based on a linear model
+  geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Forest, color = Awarded), se = se_show, alpha = 0.2) +
+  geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Forest, color = Awarded), se = se_show, alpha = 0.2) +
+  # Add a line based on conditional mean 
+  geom_smooth(data = filter(bonus_dta, score_centered <= 0), aes(x = score_centered, y = Forest, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_smooth(data = filter(bonus_dta, score_centered > 0), aes(x = score_centered, y = Forest, color = Awarded), method = "lm", linetype = "dashed", se = F) +
+  geom_vline(xintercept = 0) +
+  labs(x = "Centered score", y = "Overall forest")+
+  theme_minimal()+
+  scale_color_manual(values = c(palette$blue, palette$red), guide="none")+
+  xlim(-plot_bw, plot_bw)
+Forest
 
 Native <- ggplot() +
   geom_point(data = conditionalMean_bin, aes(x = score_centered, y = Native), size = 2.5, alpha = 0.7, color = "black") +
